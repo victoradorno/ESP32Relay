@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador de Movimiento Parabólico</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Estilos personalizados y base */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Ocultar las flechas en los inputs de tipo número */
+        input[type=number]::-webkit-inner-spin-button,
+        input[type=number]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white antialiased">
+
+    <div class="container mx-auto p-4 lg:p-8 min-h-screen flex flex-col">
+        <header class="text-center mb-6">
+            <h1 class="text-3xl md:text-4xl font-bold text-cyan-400">Simulador de Movimiento Parabólico</h1>
+            <p class="text-gray-400 mt-2">Una herramienta interactiva para visualizar la física de proyectiles.</p>
+        </header>
+
+        <main class="flex-grow flex flex-col lg:flex-row gap-8">
+
+            <!-- Columna Izquierda: Simulación -->
+            <div class="lg:w-7/12 flex-grow flex flex-col bg-gray-800 rounded-lg shadow-2xl p-4">
+                <canvas id="simulationCanvas" class="w-full h-full rounded-md min-h-[300px] md:min-h-[400px] lg:min-h-0"></canvas>
+            </div>
+
+            <!-- Columna Derecha: Panel de Control -->
+            <div class="lg:w-5/12">
+                <div class="bg-gray-800 rounded-lg shadow-2xl p-6 space-y-6">
+
+                    <!-- 1. Condiciones Iniciales -->
+                    <div>
+                        <h2 class="text-xl font-semibold border-b border-gray-600 pb-2 mb-4">Condiciones Iniciales</h2>
+                        <div class="space-y-4">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label for="initialVelocity" class="block text-sm font-medium text-gray-300 mb-1">Velocidad Inicial (v₀)</label>
+                                    <div class="relative">
+                                        <input type="number" id="initialVelocity" value="50" class="w-full bg-gray-700 border border-gray-600 rounded-md p-2 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500" placeholder="e.g., 50">
+                                        <span class="absolute inset-y-0 right-0 pr-3 flex items-center text-sm text-gray-400">m/s</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label for="launchAngle" class="block text-sm font-medium text-gray-300 mb-1">Ángulo (θ)</label>
+                                    <div class="relative">
+                                        <input type="number" id="launchAngle" value="45" class="w-full bg-gray-700 border border-gray-600 rounded-md p-2 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500" placeholder="e.g., 45">
+                                        <span class="absolute inset-y-0 right-0 pr-3 flex items-center text-sm text-gray-400">°</span>
+                                    </div>
+                                </div>
+                            </div>
+                             <div>
+                                <label for="gravity" class="block text-sm font-medium text-gray-300 mb-1">Gravedad (g)</label>
+                                <div class="relative">
+                                    <input type="number" id="gravity" value="9.81" step="0.01" class="w-full bg-gray-700 border border-gray-600 rounded-md p-2 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500">
+                                    <span class="absolute inset-y-0 right-0 pr-3 flex items-center text-sm text-gray-400">m/s²</span>
+                                </div>
+                            </div>
+
+                            <!-- NEW TIME INPUT SECTION -->
+                            <div class="pt-4 border-t border-gray-700 space-y-3">
+                                <label class="flex items-center space-x-2 cursor-pointer">
+                                    <input type="checkbox" id="enableTimeCheckbox" class="form-checkbox bg-gray-700 border-gray-500 text-cyan-500 focus:ring-cyan-600">
+                                    <span>Calcular en un tiempo específico</span>
+                                </label>
+                                <div id="timeInputContainer" class="opacity-50 transition-opacity">
+                                    <label for="timeInput" class="block text-sm font-medium text-gray-300 mb-1">Tiempo (t)</label>
+                                    <div class="relative">
+                                        <input type="number" id="timeInput" disabled class="w-full bg-gray-700 border border-gray-600 rounded-md p-2 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 disabled:bg-gray-800 disabled:cursor-not-allowed" placeholder="e.g., 2.5">
+                                        <span class="absolute inset-y-0 right-0 pr-3 flex items-center text-sm text-gray-400">s</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 2. Controles de Simulación -->
+                    <div>
+                        <h2 class="text-xl font-semibold border-b border-gray-600 pb-2 mb-4">Controles</h2>
+                        <div class="flex flex-col sm:flex-row gap-4">
+                            <button id="simulateButton" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300">Simular</button>
+                            <button id="resetButton" class="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300">Reiniciar</button>
+                        </div>
+                        <p id="error-message" class="text-red-400 text-sm mt-2 text-center h-4"></p>
+                    </div>
+                    
+                    <!-- Opciones de Visualización -->
+                    <div>
+                         <h3 class="text-lg font-semibold mb-3">Opciones de Visualización</h3>
+                         <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-sm">
+                            <label class="flex items-center space-x-2 p-2 rounded-md hover:bg-gray-700 cursor-pointer"><input type="checkbox" id="showVelocityVector" class="form-checkbox bg-gray-700 border-gray-500 text-cyan-500 focus:ring-cyan-600"><span>Velocidad</span></label>
+                            <label class="flex items-center space-x-2 p-2 rounded-md hover:bg-gray-700 cursor-pointer"><input type="checkbox" id="showVelocityComponents" class="form-checkbox bg-gray-700 border-gray-500 text-cyan-500 focus:ring-cyan-600"><span>Componentes v</span></label>
+                            <label class="flex items-center space-x-2 p-2 rounded-md hover:bg-gray-700 cursor-pointer"><input type="checkbox" id="showAccelerationVector" class="form-checkbox bg-gray-700 border-gray-500 text-cyan-500 focus:ring-cyan-600"><span>Aceleración</span></label>
+                         </div>
+                    </div>
+
+                    <!-- 3. Panel de Resultados -->
+                    <div class="bg-gray-900/50 p-4 rounded-lg">
+                        <h2 class="text-xl font-semibold border-b border-gray-600 pb-2 mb-4">Resultados</h2>
+                        <div class="space-y-3">
+                             <div class="flex justify-between text-sm"><span>Altura Máxima (h_max):</span><span id="maxHeightResult" class="font-mono font-semibold">-- m</span></div>
+                             <div class="flex justify-between text-sm"><span>Alcance Máximo (R_max):</span><span id="maxRangeResult" class="font-mono font-semibold">-- m</span></div>
+                             <div class="flex justify-between text-sm"><span>Tiempo de Vuelo (t_vuelo):</span><span id="timeOfFlightResult" class="font-mono font-semibold">-- s</span></div>
+                             <div class="mt-4 pt-4 border-t border-gray-700 space-y-3">
+                                <div class="flex justify-between text-sm"><span>Tiempo (t):</span><span id="currentTime" class="font-mono font-semibold">0.00 s</span></div>
+                                <div class="flex justify-between text-sm"><span>Posición (x, y):</span><span id="currentPosition" class="font-mono font-semibold">(0.0, 0.0) m</span></div>
+                                <div class="flex justify-between text-sm"><span>Velocidad (v):</span><span id="currentVelocity" class="font-mono font-semibold">0.00 m/s</span></div>
+                                <div class="flex justify-between text-sm"><span>Componentes (vₓ, vᵧ):</span><span id="currentVelocityComponents" class="font-mono font-semibold">(0.0, 0.0) m/s</span></div>
+                             </div>
+                        </div>
+                    </div>
+
+                    <!-- 4. Fórmulas Físicas -->
+                    <details class="bg-gray-900/50 p-4 rounded-lg cursor-pointer">
+                        <summary class="text-lg font-semibold">Fórmulas Físicas</summary>
+                        <div class="mt-4 space-y-2 text-gray-300 text-sm font-mono">
+                            <p>x(t) = v₀ ⋅ cos(θ) ⋅ t</p>
+                            <p>y(t) = v₀ ⋅ sin(θ) ⋅ t - ½ ⋅ g ⋅ t²</p>
+                            <p>vₓ(t) = v₀ ⋅ cos(θ)</p>
+                            <p>vᵧ(t) = v₀ ⋅ sin(θ) - g ⋅ t</p>
+                        </div>
+                    </details>
+                </div>
+            </div>
+        </main>
+    </div>
+
+<script>
+    // Esperar a que el DOM esté completamente cargado
+    document.addEventListener('DOMContentLoaded', () => {
+
+        // Selección de elementos del DOM
+        const canvas = document.getElementById('simulationCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const initialVelocityInput = document.getElementById('initialVelocity');
+        const launchAngleInput = document.getElementById('launchAngle');
+        const gravityInput = document.getElementById('gravity');
+
+        const enableTimeCheckbox = document.getElementById('enableTimeCheckbox');
+        const timeInputContainer = document.getElementById('timeInputContainer');
+        const timeInput = document.getElementById('timeInput');
+
+        const simulateButton = document.getElementById('simulateButton');
+        const resetButton = document.getElementById('resetButton');
+        const errorMessage = document.getElementById('error-message');
+
+        const showVelocityVectorCheckbox = document.getElementById('showVelocityVector');
+        const showVelocityComponentsCheckbox = document.getElementById('showVelocityComponents');
+        const showAccelerationVectorCheckbox = document.getElementById('showAccelerationVector');
+
+        const maxHeightResult = document.getElementById('maxHeightResult');
+        const maxRangeResult = document.getElementById('maxRangeResult');
+        const timeOfFlightResult = document.getElementById('timeOfFlightResult');
+        const currentTime = document.getElementById('currentTime');
+        const currentPosition = document.getElementById('currentPosition');
+        const currentVelocity = document.getElementById('currentVelocity');
+        const currentVelocityComponents = document.getElementById('currentVelocityComponents');
+
+        // Estado de la simulación
+        let animationFrameId = null;
+        let simulationParams = {};
+        let projectile = {
+            x: 0,
+            y: 0,
+            path: []
+        };
+        const PADDING = 50;
+
+        // Función para ajustar el tamaño del canvas al de su contenedor
+        function resizeCanvas() {
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+            drawGrid(); // Redibujar la cuadrícula al cambiar tamaño
+        }
+
+        // Función para dibujar la cuadrícula y los ejes
+        function drawGrid(maxX = 100, maxY = 50) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const dpr = window.devicePixelRatio || 1;
+            const viewWidth = canvas.width / dpr;
+            const viewHeight = canvas.height / dpr;
+            
+            const scaleX = (viewWidth - 2 * PADDING) / maxX;
+            const scaleY = (viewHeight - 2 * PADDING) / maxY;
+
+            ctx.strokeStyle = '#4A5568'; // gray-700
+            ctx.fillStyle = '#E2E8F0'; // gray-300
+            ctx.font = '10px Inter';
+            ctx.lineWidth = 1;
+
+            // Ejes
+            ctx.beginPath();
+            ctx.moveTo(PADDING, PADDING);
+            ctx.lineTo(PADDING, viewHeight - PADDING);
+            ctx.lineTo(viewWidth - PADDING, viewHeight - PADDING);
+            ctx.stroke();
+
+            // Etiquetas de ejes
+            ctx.save();
+            ctx.translate(PADDING / 4, viewHeight / 2);
+            ctx.rotate(-Math.PI / 2);
+            ctx.textAlign = 'center';
+            ctx.fillText('Altura (m)', 0, 0);
+            ctx.restore();
+            
+            ctx.textAlign = 'center';
+            ctx.fillText('Distancia (m)', viewWidth / 2, viewHeight - PADDING / 2.5);
+
+            // Marcas en el eje X
+            for (let i = 0; i <= 10; i++) {
+                const x = PADDING + i * (viewWidth - 2 * PADDING) / 10;
+                ctx.beginPath();
+                ctx.moveTo(x, viewHeight - PADDING);
+                ctx.lineTo(x, viewHeight - PADDING + 5);
+                ctx.stroke();
+                ctx.fillText((i * maxX / 10).toFixed(0), x, viewHeight - PADDING + 20);
+            }
+
+            // Marcas en el eje Y
+            for (let i = 0; i <= 10; i++) {
+                const y = viewHeight - PADDING - i * (viewHeight - 2 * PADDING) / 10;
+                ctx.beginPath();
+                ctx.moveTo(PADDING, y);
+                ctx.lineTo(PADDING - 5, y);
+                ctx.stroke();
+                ctx.textAlign = 'right';
+                ctx.fillText((i * maxY / 10).toFixed(0), PADDING - 10, y + 3);
+            }
+            
+            return { scaleX, scaleY };
+        }
+        
+        // Función para dibujar una flecha
+        function drawArrow(fromX, fromY, toX, toY, color, lineWidth = 2) {
+            const headlen = 10; // length of head in pixels
+            const dx = toX - fromX;
+            const dy = toY - fromY;
+            const angle = Math.atan2(dy, dx);
+            
+            ctx.strokeStyle = color;
+            ctx.lineWidth = lineWidth;
+            
+            ctx.beginPath();
+            ctx.moveTo(fromX, fromY);
+            ctx.lineTo(toX, toY);
+            ctx.lineTo(toX - headlen * Math.cos(angle - Math.PI / 6), toY - headlen * Math.sin(angle - Math.PI / 6));
+            ctx.moveTo(toX, toY);
+            ctx.lineTo(toX - headlen * Math.cos(angle + Math.PI / 6), toY - headlen * Math.sin(angle + Math.PI / 6));
+            ctx.stroke();
+        }
+
+        // Función principal de la animación
+        function animate(timestamp) {
+            const { v0x, v0y, g, timeOfFlight, scaleX, scaleY } = simulationParams;
+            const dpr = window.devicePixelRatio || 1;
+            const viewHeight = canvas.height / dpr;
+
+            const elapsedTime = (timestamp - simulationParams.startTime) / 1000;
+
+            if (elapsedTime > timeOfFlight + 0.05) { // Añadir un pequeño margen
+                resetRealTimeData(timeOfFlight);
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+                return;
+            }
+
+            // Cálculo de la posición y velocidad actuales
+            const x = v0x * elapsedTime;
+            const y = v0y * elapsedTime - 0.5 * g * elapsedTime * elapsedTime;
+
+            const vx = v0x;
+            const vy = v0y - g * elapsedTime;
+            const v = Math.sqrt(vx * vx + vy * vy);
+            
+            projectile = { x, y, path: [...projectile.path, {x, y}] };
+
+            // Limpiar y redibujar
+            drawGrid(simulationParams.maxRange * 1.1, simulationParams.maxHeight * 1.1);
+
+            // Transformar coordenadas físicas a coordenadas del canvas
+            const canvasX = PADDING + x * scaleX;
+            const canvasY = viewHeight - PADDING - y * scaleY;
+
+            // Dibujar trayectoria
+            ctx.beginPath();
+            ctx.strokeStyle = '#64748B'; // gray-500
+            ctx.lineWidth = 2;
+            ctx.moveTo(PADDING, viewHeight - PADDING);
+            projectile.path.forEach(p => {
+                ctx.lineTo(PADDING + p.x * scaleX, viewHeight - PADDING - p.y * scaleY);
+            });
+            ctx.stroke();
+
+            // Dibujar proyectil
+            ctx.beginPath();
+            ctx.arc(canvasX, canvasY, 5, 0, 2 * Math.PI);
+            ctx.fillStyle = '#67E8F9'; // cyan-300
+            ctx.fill();
+
+            // Dibujar vectores
+            const vectorScale = 2.5; // Escala para la longitud visual de los vectores
+            if(showVelocityVectorCheckbox.checked) {
+                drawArrow(canvasX, canvasY, canvasX + vx * vectorScale, canvasY - vy * vectorScale, '#F472B6'); // pink-400
+            }
+            if(showVelocityComponentsCheckbox.checked) {
+                ctx.setLineDash([5, 5]);
+                drawArrow(canvasX, canvasY, canvasX + vx * vectorScale, canvasY, '#60A5FA'); // blue-400
+                drawArrow(canvasX, canvasY, canvasX, canvasY - vy * vectorScale, '#60A5FA');
+                ctx.setLineDash([]);
+            }
+            if(showAccelerationVectorCheckbox.checked) {
+                drawArrow(canvasX, canvasY, canvasX, canvasY + g * vectorScale, '#4ADE80'); // green-400
+            }
+
+
+            // Actualizar datos en tiempo real
+            currentTime.textContent = `${elapsedTime.toFixed(2)} s`;
+            currentPosition.textContent = `(${x.toFixed(1)}, ${y.toFixed(1)}) m`;
+            currentVelocity.textContent = `${v.toFixed(2)} m/s`;
+            currentVelocityComponents.textContent = `(${vx.toFixed(1)}, ${vy.toFixed(1)}) m/s`;
+
+
+            animationFrameId = requestAnimationFrame(animate);
+        }
+
+        function runSimulation() {
+            // Detener cualquier animación previa
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+
+            // 1. Validar entradas
+            const v0 = parseFloat(initialVelocityInput.value);
+            const angle = parseFloat(launchAngleInput.value);
+            const g = parseFloat(gravityInput.value);
+
+            if (isNaN(v0) || isNaN(angle) || isNaN(g) || v0 <= 0) {
+                errorMessage.textContent = 'Por favor, introduce valores válidos.';
+                return;
+            }
+             if (angle < 0 || angle > 90) {
+                errorMessage.textContent = 'El ángulo debe estar entre 0 y 90 grados.';
+                return;
+            }
+            errorMessage.textContent = '';
+
+
+            // 2. Cálculos físicos
+            const angleRad = angle * (Math.PI / 180);
+            const v0x = v0 * Math.cos(angleRad);
+            const v0y = v0 * Math.sin(angleRad);
+
+            const timeOfFlight = (2 * v0y) / g;
+            const maxRange = v0x * timeOfFlight;
+            const maxHeight = (v0y * v0y) / (2 * g);
+
+            // 3. Mostrar resultados principales
+            maxHeightResult.textContent = `${maxHeight.toFixed(2)} m`;
+            maxRangeResult.textContent = `${maxRange.toFixed(2)} m`;
+            timeOfFlightResult.textContent = `${timeOfFlight.toFixed(2)} s`;
+
+            const { scaleX, scaleY } = drawGrid(maxRange * 1.1, maxHeight * 1.1);
+            
+            simulationParams = {
+                v0, angle, g, angleRad, v0x, v0y,
+                timeOfFlight, maxRange, maxHeight,
+                scaleX, scaleY,
+                startTime: performance.now()
+            };
+
+            // 4. Decidir si animar o calcular en un punto
+            if (enableTimeCheckbox.checked) {
+                // Calcular en un tiempo específico
+                const t = parseFloat(timeInput.value);
+                if (isNaN(t) || t < 0) {
+                    errorMessage.textContent = 'Por favor, introduce un tiempo válido.';
+                    return;
+                }
+                if (t > timeOfFlight) {
+                    errorMessage.textContent = `El tiempo debe ser menor que el tiempo de vuelo (${timeOfFlight.toFixed(2)}s).`;
+                    return;
+                }
+                drawStateAtTime(t);
+
+            } else {
+                // Iniciar animación completa
+                projectile = { x: 0, y: 0, path: [] };
+                resetRealTimeData(0, v0);
+                animationFrameId = requestAnimationFrame(animate);
+            }
+        }
+
+        // Función para dibujar el estado en un tiempo específico t
+        function drawStateAtTime(t) {
+            const { v0x, v0y, g, scaleX, scaleY, maxRange, maxHeight } = simulationParams;
+            const dpr = window.devicePixelRatio || 1;
+            const viewHeight = canvas.height / dpr;
+
+            // Calcular posición y velocidad en t
+            const x = v0x * t;
+            const y = v0y * t - 0.5 * g * t * t;
+            const vx = v0x;
+            const vy = v0y - g * t;
+            const v = Math.sqrt(vx * vx + vy * vy);
+
+            // Redibujar la escena
+            drawGrid(maxRange * 1.1, maxHeight * 1.1);
+
+            // Dibujar trayectoria hasta t
+            const path = [];
+            const steps = 100;
+            const dt = t / steps;
+            for (let i = 0; i <= steps; i++) {
+                const currentTime = i * dt;
+                path.push({
+                    x: v0x * currentTime,
+                    y: v0y * currentTime - 0.5 * g * currentTime * currentTime
+                });
+            }
+            
+            ctx.beginPath();
+            ctx.strokeStyle = '#64748B';
+            ctx.lineWidth = 2;
+            ctx.moveTo(PADDING, viewHeight - PADDING);
+            path.forEach(p => {
+                ctx.lineTo(PADDING + p.x * scaleX, viewHeight - PADDING - p.y * scaleY);
+            });
+            ctx.stroke();
+
+            // Dibujar proyectil y vectores en t
+            const canvasX = PADDING + x * scaleX;
+            const canvasY = viewHeight - PADDING - y * scaleY;
+            
+            ctx.beginPath();
+            ctx.arc(canvasX, canvasY, 5, 0, 2 * Math.PI);
+            ctx.fillStyle = '#67E8F9';
+            ctx.fill();
+
+            const vectorScale = 2.5;
+            if (showVelocityVectorCheckbox.checked) drawArrow(canvasX, canvasY, canvasX + vx * vectorScale, canvasY - vy * vectorScale, '#F472B6');
+            if (showVelocityComponentsCheckbox.checked) {
+                ctx.setLineDash([5, 5]);
+                drawArrow(canvasX, canvasY, canvasX + vx * vectorScale, canvasY, '#60A5FA');
+                drawArrow(canvasX, canvasY, canvasX, canvasY - vy * vectorScale, '#60A5FA');
+                ctx.setLineDash([]);
+            }
+            if (showAccelerationVectorCheckbox.checked) drawArrow(canvasX, canvasY, canvasX, canvasY + g * vectorScale, '#4ADE80');
+            
+            // Actualizar panel de datos en tiempo real
+            currentTime.textContent = `${t.toFixed(2)} s`;
+            currentPosition.textContent = `(${x.toFixed(1)}, ${y.toFixed(1)}) m`;
+            currentVelocity.textContent = `${v.toFixed(2)} m/s`;
+            currentVelocityComponents.textContent = `(${vx.toFixed(1)}, ${vy.toFixed(1)}) m/s`;
+        }
+
+        function resetRealTimeData(finalTime = null, initialVelocity = null) {
+            const { v0x, v0y, g } = simulationParams;
+            if (finalTime !== null && v0y !== undefined) {
+                 const finalX = v0x * finalTime;
+                 const finalY = (v0y * finalTime) - 0.5 * g * finalTime * finalTime;
+                 currentTime.textContent = `${finalTime.toFixed(2)} s`;
+                 currentPosition.textContent = `(${finalX.toFixed(1)}, ${finalY.toFixed(1)}) m`;
+                 const finalVy = v0y - g * finalTime;
+                 const finalV = Math.sqrt(v0x*v0x + finalVy*finalVy);
+                 currentVelocity.textContent = `${finalV.toFixed(2)} m/s`;
+                 currentVelocityComponents.textContent = `(${v0x.toFixed(1)}, ${finalVy.toFixed(1)}) m/s`;
+            } else {
+                 currentTime.textContent = '0.00 s';
+                 currentPosition.textContent = '(0.0, 0.0) m';
+                 currentVelocity.textContent = initialVelocity ? `${initialVelocity.toFixed(2)} m/s` : '0.00 m/s';
+                 currentVelocityComponents.textContent = `(0.0, 0.0) m/s`;
+            }
+        }
+
+        function resetSimulation() {
+             if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+            // Limpiar valores de resultados
+            maxHeightResult.textContent = '-- m';
+            maxRangeResult.textContent = '-- m';
+            timeOfFlightResult.textContent = '-- s';
+            resetRealTimeData();
+            errorMessage.textContent = '';
+            
+            // Resetear inputs nuevos
+            enableTimeCheckbox.checked = false;
+            timeInput.disabled = true;
+            timeInput.value = '';
+            timeInputContainer.classList.add('opacity-50');
+            simulateButton.textContent = 'Simular';
+
+            // Limpiar estado
+            simulationParams = {};
+            projectile = { x: 0, y: 0, path: [] };
+            
+            // Redibujar la cuadrícula por defecto
+            drawGrid();
+        }
+
+        // Event Listeners
+        enableTimeCheckbox.addEventListener('change', () => {
+            const isDisabled = !enableTimeCheckbox.checked;
+            timeInput.disabled = isDisabled;
+            if (isDisabled) {
+                timeInput.value = '';
+                timeInputContainer.classList.add('opacity-50');
+                simulateButton.textContent = 'Simular';
+            } else {
+                timeInputContainer.classList.remove('opacity-50');
+                simulateButton.textContent = 'Calcular';
+            }
+        });
+
+        simulateButton.addEventListener('click', runSimulation);
+        resetButton.addEventListener('click', resetSimulation);
+        window.addEventListener('resize', resizeCanvas);
+
+        // Inicialización
+        resizeCanvas();
+    });
+</script>
+
+</body>
+</html>
