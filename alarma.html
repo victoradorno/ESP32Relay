@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Control de Alarma ESP32</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --bg-color: #f0f2f5;
+      --card-bg: #ffffff;
+      --primary: #1e88e5;
+      --danger: #d32f2f;
+      --success: #4caf50;
+      --text: #333;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      text-align: center;
+      background-color: var(--bg-color);
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      color: var(--text);
+    }
+
+    h1 {
+      margin-top: 40px;
+      font-size: 1.5rem;
+      color: #444;
+    }
+
+    /* Contenedor del Login */
+    #loginForm {
+      max-width: 350px;
+      margin: 100px auto;
+      background: var(--card-bg);
+      padding: 40px 30px;
+      border-radius: 20px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    }
+
+    #loginForm input {
+      width: 100%;
+      padding: 12px;
+      margin: 10px 0;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      box-sizing: border-box;
+    }
+
+    #loginForm button {
+      width: 100%;
+      background-color: var(--primary);
+      color: white;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+      margin-top: 10px;
+    }
+
+    /* Dashboard Alarma */
+    #dashboard {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      flex: 1;
+      padding-top: 20px;
+    }
+
+    .alarm-container {
+      background: var(--card-bg);
+      width: 280px;
+      margin: 20px auto;
+      padding: 30px;
+      border-radius: 25px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+      transition: transform 0.2s;
+    }
+
+    /* Icono de Alarma Animado */
+    .alarm-icon-box {
+      width: 120px;
+      height: 120px;
+      margin: 0 auto 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      transition: all 0.3s ease;
+      background: #eee;
+    }
+
+    .alarm-icon-box svg {
+      width: 60px;
+      height: 60px;
+      fill: #999;
+      transition: all 0.3s ease;
+    }
+
+    /* Estados de la Alarma */
+    .status-active .alarm-icon-box {
+      background: #ffebee;
+      box-shadow: 0 0 20px rgba(211, 47, 47, 0.4);
+      animation: pulse 1.5s infinite;
+    }
+
+    .status-active svg {
+      fill: var(--danger);
+    }
+
+    .status-inactive .alarm-icon-box {
+      background: #e8f5e9;
+    }
+
+    .status-inactive svg {
+      fill: var(--success);
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+
+    .status-label {
+      font-size: 1.2rem;
+      font-weight: bold;
+      margin-top: 15px;
+    }
+
+    .btn-action {
+      margin-top: 20px;
+      padding: 12px 30px;
+      border: none;
+      border-radius: 50px;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      width: 100%;
+      transition: opacity 0.3s;
+    }
+
+    /* Botón Cerrar Sesión */
+    .logout-container {
+      margin-top: 30px;
+      width: 280px;
+    }
+
+    #logoutBtn {
+      background-color: #555;
+      color: white;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 14px;
+      width: 100%;
+      transition: all 0.3s;
+    }
+
+    #logoutBtn:hover {
+      background-color: #333;
+    }
+
+    #logoutBtn.disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+
+    .custom-alert {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #333;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 8px;
+      display: none;
+      z-index: 1000;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      font-weight: 500;
+      min-width: 250px;
+    }
+
+    footer {
+      padding: 20px;
+      font-size: 0.8rem;
+      color: #aaa;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="toast" class="custom-alert"></div>
+
+  <h1>Sistema de Alarma</h1>
+
+  <!-- Formulario de Login -->
+  <div id="loginForm">
+    <h2 style="margin-top:0">Iniciar Sesión</h2>
+    <input type="email" id="email" placeholder="Correo electrónico" required />
+    <input type="password" id="password" placeholder="Contraseña" required />
+    <button id="loginBtn">INGRESAR</button>
+  </div>
+
+  <!-- Dashboard Único Relay 1 -->
+  <div id="dashboard">
+    <div id="alarmCard" class="alarm-container status-inactive">
+      <div class="alarm-icon-box" id="btnToggle">
+        <svg viewBox="0 0 24 24">
+          <path d="M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20A8,8 0 0,0 20,12A8,8 0 0,0 12,4M12,6A6,6 0 0,1 18,12A6,6 0 0,1 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6M12,8A4,4 0 0,0 8,12A4,4 0 0,0 12,16A4,4 0 0,0 16,12A4,4 0 0,0 12,8Z" />
+        </svg>
+      </div>
+      <div class="status-label" id="statusText">CARGANDO...</div>
+      <button class="btn-action" id="mainButton" style="background-color: var(--primary);">CONECTAR</button>
+    </div>
+
+    <!-- Contenedor del Botón Logout -->
+    <div class="logout-container">
+      <button id="logoutBtn">Cerrar Sesión</button>
+    </div>
+  </div>
+
+  <footer>
+    Panel de Control Seguro
+  </footer>
+
+  <!-- Firebase SDKs Compat -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyBFiiTaoxS2RtgaxPFUw1-StFqHxiUEO8g",
+      authDomain: "esp32firebase-da1a6.firebaseapp.com",
+      databaseURL: "https://esp32firebase-da1a6-default-rtdb.firebaseio.com",
+      projectId: "esp32firebase-da1a6",
+      storageBucket: "esp32firebase-da1a6.firebasestorage.app",
+      messagingSenderId: "234121006092",
+      appId: "1:234121006092:web:9a876c595cbac68d317229",
+      measurementId: "G-9XJEP2SPHP"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+
+    const allowedEmail = "victor.adorno@gmail.com";
+    const allowedPassword = "12345678";
+
+    // Estado global de la alarma
+    let isAlarmActive = false;
+
+    const loginForm = document.getElementById("loginForm");
+    const dashboard = document.getElementById("dashboard");
+    const loginBtn = document.getElementById("loginBtn");
+    const toast = document.getElementById("toast");
+
+    function showMessage(msg) {
+      toast.innerText = msg;
+      toast.style.display = "block";
+      setTimeout(() => { toast.style.display = "none"; }, 3500);
+    }
+
+    loginBtn.addEventListener("click", () => {
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+
+      if (!email || !password) {
+        showMessage("Ingresa tus credenciales");
+        return;
+      }
+
+      if(email === allowedEmail && password === allowedPassword){
+        firebase.auth().signInWithEmailAndPassword(email, password)
+          .then(() => {
+            loginForm.style.display = "none";
+            dashboard.style.display = "flex";
+            startAlarmControl();
+          })
+          .catch(error => {
+            showMessage("Error de conexión: " + error.message);
+          });
+      } else {
+        showMessage("Credenciales inválidas");
+      }
+    });
+
+    function startAlarmControl() {
+      const db = firebase.database();
+      const statusText = document.getElementById("statusText");
+      const alarmCard = document.getElementById("alarmCard");
+      const mainButton = document.getElementById("mainButton");
+      const toggleAction = document.getElementById("btnToggle");
+      const logoutBtn = document.getElementById("logoutBtn");
+      
+      const relayRef = db.ref("/relay1");
+
+      relayRef.on("value", (snapshot) => {
+        isAlarmActive = !!snapshot.val();
+        
+        if (isAlarmActive) {
+          statusText.innerText = "ALARMA ACTIVA";
+          statusText.style.color = "#d32f2f";
+          alarmCard.className = "alarm-container status-active";
+          mainButton.innerText = "DESACTIVAR";
+          mainButton.style.backgroundColor = "#d32f2f";
+          logoutBtn.classList.add("disabled");
+        } else {
+          statusText.innerText = "SISTEMA SEGURO";
+          statusText.style.color = "#4caf50";
+          alarmCard.className = "alarm-container status-inactive";
+          mainButton.innerText = "ACTIVAR ALARMA";
+          mainButton.style.backgroundColor = "#4caf50";
+          logoutBtn.classList.remove("disabled");
+        }
+      });
+
+      const handleToggle = () => {
+        relayRef.get().then(snap => {
+          relayRef.set(!snap.val());
+        });
+      };
+
+      mainButton.onclick = handleToggle;
+      toggleAction.onclick = handleToggle;
+    }
+
+    document.getElementById("logoutBtn").onclick = () => {
+      if (isAlarmActive) {
+        showMessage("⚠️ No puede cerrar sesión con la ALARMA ACTIVA");
+        return;
+      }
+
+      firebase.auth().signOut()
+        .then(() => {
+          dashboard.style.display = "none";
+          loginForm.style.display = "block";
+          document.getElementById("password").value = "";
+          showMessage("Sesión cerrada correctamente");
+        });
+    };
+  </script>
+</body>
+</html>
